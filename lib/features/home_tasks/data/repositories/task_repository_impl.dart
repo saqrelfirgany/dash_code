@@ -1,23 +1,25 @@
+import 'dart:developer';
+
 import '../../domain/entities/task.dart';
 import '../../domain/repositories/task_repository.dart';
 import '../data_sources/local_data_source.dart';
 import '../models/task_model.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
-  final LocalDataSource localDataSource;
+  final LocalTaskSource localDataSource = LocalTaskSourceImpl();
 
-  TaskRepositoryImpl({required this.localDataSource});
+  TaskRepositoryImpl();
 
   @override
   Future<List<Task>> getTasks() async {
-    final tasksJson = await localDataSource.getTasks();
-    return tasksJson.map((json) => TaskModel.fromJson(json)).toList();
+    final tasksList = await localDataSource.getTasks();
+    return tasksList.toEntities();
   }
 
   @override
   Future<void> addTask(Task task) async {
     final tasks = await getTasks();
-    final updatedTasks = [...tasks, TaskModel.fromEntity(task)];
+    final updatedTasks = [...tasks, task];
     await _saveTasks(updatedTasks);
   }
 
@@ -37,7 +39,7 @@ class TaskRepositoryImpl implements TaskRepository {
   }
 
   Future<void> _saveTasks(List<Task> tasks) async {
-    final tasksJson = tasks.map((task) => TaskModel.fromEntity(task).toJson()).toList();
+    final tasksJson = tasks.toModels().map((model) => model.toJson()).toList();
     await localDataSource.saveTasks(tasksJson);
   }
 }

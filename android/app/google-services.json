@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "317119741967",
+    "project_id": "flutterdashcode",
+    "storage_bucket": "flutterdashcode.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:317119741967:android:fcd46b72089d28062ce37a",
+        "android_client_info": {
+          "package_name": "com.saqrelfirgany.dash_code"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCsK3YzCecm34id8b_GXkEQZyFCFMMJbY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

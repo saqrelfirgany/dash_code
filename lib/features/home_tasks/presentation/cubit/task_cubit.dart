@@ -1,35 +1,103 @@
-class TaskCubit extends Cubit<TaskState> {
-  final GetTasks getTasks;
-  final AddTask addTask;
-  final UpdateTask updateTaskUseCase;
-  final DeleteTask deleteTask;
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:injectable/injectable.dart';
 
-  TaskCubit({
-    required this.getTasks,
-    required this.addTask,
-    required this.updateTaskUseCase,
-    required this.deleteTask,
-  }) : super(TaskInitial());
+import '../../domain/entities/task.dart';
+import '../../domain/usecases/add_task.dart';
+import '../../domain/usecases/delete_task.dart';
+import '../../domain/usecases/get_tasks.dart';
+import '../../domain/usecases/search_tasks.dart';
+import '../../domain/usecases/update_task.dart';
+import 'task_state.dart';
+
+@lazySingleton
+class TaskCubit extends Cubit<TaskState> {
+  final GetTasks _getTasks = GetTasks();
+  final AddTask _addTask = AddTask();
+  final UpdateTask _updateTask = UpdateTask();
+  final DeleteTask _deleteTask = DeleteTask();
+  final SearchTasks _searchTasks = SearchTasks();
+
+  List<Task> _allTasks = [];
+  String _currentSearchQuery = '';
+
+  TaskCubit() : super(TaskInitial()) {
+    loadTasks();
+  }
 
   Future<void> loadTasks() async {
     emit(TaskLoading());
-    final result = await getTasks();
-    emit(TaskLoaded(result));
+    try {
+      _allTasks = await _getTasks();
+      _applySearchFilter();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
   }
 
-  Future<void> createTask(String title) async {
-    final task = Task(title: title);
-    await addTask(task);
-    await loadTasks();
+  Future<void> addTask(String title) async {
+    try {
+      final newTask = Task(title: title);
+      await _addTask(newTask);
+      await _refreshTasks();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
   }
 
-  Future<void> updateTask(Task task) async {
-    await updateTaskUseCase(task);
-    await loadTasks();
+  Future<void> updateTask(Task updatedTask) async {
+    try {
+      await _updateTask(updatedTask);
+      await _refreshTasks();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
   }
 
-  Future<void> removeTask(String taskId) async {
-    await deleteTask(taskId);
-    await loadTasks();
+  Future<void> deleteTask(String taskId) async {
+    try {
+      await _deleteTask(taskId);
+      await _refreshTasks();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
+  }
+
+  Future<void> toggleComplete(Task task) async {
+    try {
+      final updatedTask = task.copyWith(isCompleted: !task.isCompleted);
+      await _updateTask(updatedTask);
+      await _refreshTasks();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
+  }
+
+  void searchTasks(String query) {
+    _currentSearchQuery = query;
+    _applySearchFilter();
+  }
+
+  void clearSearch() {
+    _currentSearchQuery = '';
+    _applySearchFilter();
+  }
+
+  Future<void> _refreshTasks() async {
+    try {
+      _allTasks = await _getTasks();
+      _applySearchFilter();
+    } catch (e) {
+      emit(TaskError(e.toString()));
+    }
+  }
+
+  Future<void> _applySearchFilter() async {
+    if (_currentSearchQuery.isEmpty) {
+      emit(TaskLoaded(_allTasks));
+      return;
+    }
+
+    final filtered = await _searchTasks(_currentSearchQuery, _allTasks);
+    emit(TaskLoaded(filtered));
   }
 }

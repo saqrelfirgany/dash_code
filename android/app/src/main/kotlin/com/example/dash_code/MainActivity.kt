@@ -1,4 +1,4 @@
-package com.example.dash_code
+package com.saqrelfirgany.dash_code
 
 import io.flutter.embedding.android.FlutterActivity
 
