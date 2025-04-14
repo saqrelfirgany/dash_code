@@ -1,14 +1,9 @@
 plugins {
-    // Core Android application plugin
-    id "com.android.application"
-    // Kotlin support plugin
-    id "kotlin-android"
-    // Flutter Gradle plugin (must be applied after Android/Kotlin plugins)
-    id "dev.flutter.flutter-gradle-plugin"
-    // Firebase Google Services plugin (ensure proper configuration from the project-level buildscript)
-    id "com.google.gms.google-services"
-    // Firebase Crashlytics plugin for capturing crash reports
-    id "com.google.firebase.crashlytics"
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'dev.flutter.flutter-gradle-plugin'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.firebase-perf'
 }
 
 // Instead of applying Firebase Performance Monitoring via the plugins DSL,
@@ -42,23 +37,24 @@ android {
 
     buildTypes {
         release {
-            // Enable Crashlytics mapping file uploads for deobfuscation
-            firebaseCrashlytics {
-                mappingFileUploadEnabled true
-            }
-            // NOTE: Replace 'signingConfigs.debug' with your proper release signing configuration
-            signingConfig = signingConfigs.debug
+            minifyEnabled true
+            shrinkResources false
+            signingConfig signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
-        debug {
-            // Optionally enable Crashlytics in debug builds (useful for testing)
-            firebaseCrashlytics {
-                mappingFileUploadEnabled true
-            }
-        }
+
     }
 }
 
 flutter {
     // Point to the root Flutter project directory
     source = "../.."
+}
+
+// Dependencies required by the project
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    implementation 'com.google.firebase:firebase-crashlytics-ktx'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    debugImplementation 'com.google.firebase:firebase-crashlytics-ndk:18.6.0'
 }

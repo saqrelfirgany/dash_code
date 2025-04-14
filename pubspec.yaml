@@ -50,6 +50,7 @@ dependencies:
   build_runner: ^2.4.15
   bloc_test: ^10.0.0
   iconsax: ^0.0.8
+  firebase_performance: ^0.10.1+5
 
 
 dev_dependencies:
