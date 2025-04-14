@@ -49,6 +49,7 @@ dependencies:
   mockito: ^5.4.5
   build_runner: ^2.4.15
   bloc_test: ^10.0.0
+  iconsax: ^0.0.8
 
 
 dev_dependencies:

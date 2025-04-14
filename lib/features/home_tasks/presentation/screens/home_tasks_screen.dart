@@ -1,14 +1,16 @@
 import 'package:dash_code/core/dependency_injection/configure_dependencies.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:dash_code/features/home_tasks/presentation/screens/body/home_app_bar.dart';
+import 'package:dash_code/features/home_tasks/presentation/screens/body/home_floating_action_button.dart';
+import 'package:dash_code/features/home_tasks/presentation/screens/body/home_task_item.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/firebase/track_button_click.dart';
-import '../../../settings_feature/presentation/settings_screen.dart';
 import '../../domain/entities/task.dart';
 import '../cubit/task_cubit.dart';
 import '../cubit/task_state.dart';
+import 'body/empty_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,25 +31,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return BlocProvider.value(
       value: serviceLocator<TaskCubit>(),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Task Manager'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.add),
-          onPressed: () => _showAddTaskDialog(context),
-        ),
+        floatingActionButton: HomeFloatingActionButton(),
         body: BlocConsumer<TaskCubit, TaskState>(
           listener: (context, state) {
             if (state is TaskError) {
@@ -72,196 +61,106 @@ class _HomeScreenState extends State<HomeScreen> {
               isSearchEmpty = _isSearchActive && tasks.isEmpty;
             }
 
-            if (isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (error.isNotEmpty) {
-              return Center(child: Text(error));
-            }
-
-            return Column(
-              children: [
-                TextButton(
-                  onPressed: () {
-                    trackButtonClick('Crash app Clicked');
-                    FirebaseCrashlytics.instance.crash();
-                  },
-                  child: const Text('Crash app'),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            labelText: 'Search tasks',
-                            prefixIcon: Icon(Icons.search),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
+            return CustomScrollView(
+              slivers: [
+                HomeAppBar(),
+                if (isLoading)
+                  SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                if (error.isNotEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        error,
+                        style: const TextStyle(color: Colors.red),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.search),
+                    ),
+                  ),
+                if (!isLoading && error.isEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: TextButton.icon(
+                        icon: Icon(Icons.warning, color: colorScheme.error),
+                        label: Text('Simulate Crash',
+                            style: TextStyle(color: colorScheme.error)),
                         onPressed: () {
-                          if (_searchController.text.isNotEmpty) {
-                            cubit.searchTasks(_searchController.text);
+                          trackButtonClick('Crash app Clicked');
+                          FirebaseCrashlytics.instance.crash();
+                        },
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: SearchBar(
+                        controller: _searchController,
+                        hintText: 'Search tasks...',
+                        hintStyle: MaterialStateProperty.all(TextStyle(
+                            color: colorScheme.onSurface.withOpacity(0.5))),
+                        leading:
+                            Icon(Icons.search, color: colorScheme.onSurface),
+                        trailing: [
+                          if (_isSearchActive)
+                            IconButton(
+                              icon: Icon(Icons.close,
+                                  color: colorScheme.onSurface),
+                              onPressed: () {
+                                _searchController.clear();
+                                cubit.clearSearch();
+                                setState(() => _isSearchActive = false);
+                              },
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value.isNotEmpty) {
+                            cubit.searchTasks(value);
                             setState(() => _isSearchActive = true);
                           }
                         },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          cubit.clearSearch();
-                          setState(() => _isSearchActive = false);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: isSearchEmpty
-                      ? Center(
-                          child: Text(
-                            'No results for "${_searchController.text}"',
-                            style: Theme.of(context).textTheme.titleMedium,
+                        backgroundColor: MaterialStateProperty.all(
+                            colorScheme.surface.withOpacity(0.7)),
+                        elevation: MaterialStateProperty.all(2),
+                        shape: MaterialStateProperty.all(
+                          const ContinuousRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
                           ),
-                        )
-                      : tasks.isEmpty
-                          ? const Center(child: Text('No tasks yet!'))
-                          : ListView.builder(
-                              itemCount: tasks.length,
-                              itemBuilder: (context, index) {
-                                final task = tasks[index];
-                                return Dismissible(
-                                  key: Key(task.id),
-                                  background: Container(color: Colors.red),
-                                  confirmDismiss: (_) async {
-                                    _confirmDeleteTask(context, task.id);
-                                    return false;
-                                  },
-                                  child: ListTile(
-                                    leading: Checkbox(
-                                      value: task.isCompleted,
-                                      onChanged: (_) =>
-                                          cubit.toggleComplete(task),
-                                    ),
-                                    title: Text(
-                                      task.title,
-                                      style: TextStyle(
-                                        decoration: task.isCompleted
-                                            ? TextDecoration.lineThrough
-                                            : null,
-                                      ),
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.edit),
-                                          onPressed: () => _showEditTaskDialog(
-                                              context, task),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete),
-                                          onPressed: () => _confirmDeleteTask(
-                                              context, task.id),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (isSearchEmpty) {
+                          return EmptyState(
+                            icon: Icons.search_off,
+                            message:
+                                'No results for "${_searchController.text}"',
+                            iconColor: colorScheme.onSurface.withOpacity(0.5),
+                          );
+                        }
+                        if (tasks.isEmpty) {
+                          return EmptyState(
+                            icon: Icons.task_outlined,
+                            message: 'No tasks yet!\nTap + to add a new task',
+                            iconColor: colorScheme.onSurface.withOpacity(0.5),
+                          );
+                        }
+                        final task = tasks[index];
+                        return HomeTaskItem(task: task);
+                      },
+                      childCount:
+                          isSearchEmpty || tasks.isEmpty ? 1 : tasks.length,
+                    ),
+                  ),
+                ],
               ],
             );
           },
         ),
-      ),
-    );
-  }
-
-  void _confirmDeleteTask(BuildContext context, String taskId) {
-    trackButtonClick('confirmDeleteTask');
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Task'),
-        content: const Text('Are you sure you want to delete this task?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              serviceLocator<TaskCubit>().deleteTask(taskId);
-              Navigator.pop(context);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddTaskDialog(BuildContext context) {
-    trackButtonClick('showAddTaskDialog');
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Task'),
-        content: TextField(controller: controller),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                serviceLocator<TaskCubit>().addTask(controller.text);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditTaskDialog(BuildContext context, Task task) {
-    trackButtonClick('showEditTaskDialog');
-    final controller = TextEditingController(text: task.title);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Task'),
-        content: TextField(controller: controller),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                final updatedTask = task.copyWith(title: controller.text);
-                serviceLocator<TaskCubit>().updateTask(updatedTask);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
